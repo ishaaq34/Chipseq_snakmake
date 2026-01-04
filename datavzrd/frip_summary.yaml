@@ -1,0 +1,68 @@
+__use_yte__: true
+
+name: FRiP Analysis Summary
+
+datasets:
+  frip_summary:
+    path: ?input.table
+    separator: "\t"
+    headers:
+      - Sample
+      - Total_Reads
+      - Reads_in_Peaks
+      - FRiP
+
+views:
+  frip_table:
+    dataset: frip_summary
+    page-size: 25
+    render-table:
+      columns:
+        Sample:
+          display-mode: normal
+          ellipsis: 20
+        Total_Reads:
+          plot:
+            ticks:
+              scale: linear
+              axis-scale: linear
+          display-mode: normal
+        Reads_in_Peaks:
+          plot:
+            ticks:
+              scale: linear
+              axis-scale: linear
+          display-mode: normal
+        FRiP:
+          plot:
+            heatmap:
+              scale: linear
+              domain:
+                - 0
+                - 0.3
+              range:
+                - "#ffffff"
+                - "#2ca02c"
+          custom-plot:
+            data: |
+              function(value, row) {
+                return {
+                  spec: {
+                    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+                    "mark": {
+                      "type": "bar",
+                      "color": value >= 0.05 ? "#2ca02c" : (value >= 0.01 ? "#ff7f0e" : "#d62728")
+                    },
+                    "encoding": {
+                      "x": {
+                        "field": "FRiP",
+                        "type": "quantitative",
+                        "scale": {"domain": [0, 0.3]},
+                        "axis": null
+                      }
+                    },
+                    "data": {"values": [{"FRiP": value}]}
+                  }
+                }
+              }
+          display-mode: normal
