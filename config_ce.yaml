@@ -1,0 +1,165 @@
+# ==============================================================================
+# ChIP-seq / RNA-seq Pipeline Configuration File
+# Project: Sus scrofa (Pig) Analysis
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Genome Reference Settings
+# ------------------------------------------------------------------------------
+genome:
+  # Path to the reference genome FASTA file
+  fasta: chrI.fa
+
+  # Path to the gene annotation file (GTF format)
+  gtf: Caenorhabditis_elegans.WBcel235.115.gtf
+
+  # Output prefix for Bowtie2 index files built from the FASTA above.
+  # Example: index/organism -> index/organism.1.bt2, index/organism.2.bt2, etc.
+  index_prefix: index/organism
+
+  # Effective genome size (used for MACS3 and DeepTools normalization)
+  # For Sus scrofa, this is approximately 2.5e9
+  effective_size:  15072434
+
+  # Optional: URLs to download genome files if they are not already present.
+  # If left empty, the workflow expects the local fasta/gtf paths above to already exist.
+  fasta_url: ""
+  gtf_url: ""
+
+# ------------------------------------------------------------------------------
+# 2. Global Pipeline Settings
+# ------------------------------------------------------------------------------
+
+# Sequencing type: 'paired' (PE) or 'single' (SE)
+sequencing_type: single
+
+# Where to start the pipeline: 'raw' (FASTQ), 'trim' (trimmed FASTQ), or 'bam' (input BAM in 01_alignment/1.1_pre_dedup_bam/; {sample}.bam will be sorted to {sample}.sorted.bam; GTF/FASTA can still be downloaded if URLs are provided)
+start_from: trim
+
+# Number of CPU threads to use for multi-threaded steps
+threads: 7
+
+# Path to the metadata sheet (Tab-Separated Values)
+# Should contain columns: raw_id, condition, replicate, assay, mark_type
+metadata_tsv: metadata_from_new_names.tsv
+
+# ------------------------------------------------------------------------------
+# 3. Directory Structure
+# ------------------------------------------------------------------------------
+directories:
+  raw_reads: raw_reads # Input raw FASTQ files
+  preprocessing: 00_trimmed_reads # Trimmed-read preprocessing output
+  alignment: 01_alignment # Root for 1.1 pre-dedup BAM and 1.2 post-dedup BAM
+  bam_qc: 02_bam_quality_checks # Root for 2.1 general BAM QC and 2.2 ChIP-seq-specific BAM QC
+  deeptools: 03_deeptools_output # Root for 3.1 signal tracks, 3.2 replicatewise QC profiles, and 3.3 averaged/input-normalized enrichment outputs
+  logs: logs # Log files for all rules
+  peak_analysis: 04_peak_analysis # Root for 4.1 peak calling, 4.2 FRiP, 4.3 IDR, 4.4 consensus peaks, and 4.5 motif enrichment
+  reports: 05_analysis_reports # Final cross-workflow reports such as the analysis summary spreadsheet
+
+
+# ------------------------------------------------------------------------------
+# 4. Tool-Specific Parameters
+# ------------------------------------------------------------------------------
+
+# Adapter trimming (Trim_galore)
+trim_galore:
+  quality: 20 # Minimum Phred quality score to keep a base
+  min_length: 20 # Minimum read length after trimming
+  adapter: auto # Automatically detect adapter type (or specify 'illumina', 'nextera')
+
+# Alignment (Bowtie2)
+bowtie2:
+  sensitivity: --very-fast # Options: --very-fast, --fast, --sensitive, --very-sensitive
+  # Default is "--sensitive". --very-sensitive is better for weak signals but slower.
+  no_unal: true # Do not include unaligned reads in the BAM
+  no_mixed: true # For PE: do not attempt to align mates separately
+  no_discordant: true # For PE: do not attempt to align mates discordantly
+
+# Post-alignment filtering (Samtools)
+samtools:
+  mapq_threshold: 30 # Minimum mapping quality score to keep a read
+  sam_flags_exclude: 0 # SAM flags to exclude (e.g., 1024 for duplicates if already marked)
+
+# Deduplication (Samtools markdup)
+dedup:
+  # remove_duplicates: true (actually remove them), false (only mark them)
+  remove_duplicates: true # Highly recommended for ChIP-seq to avoid PCR bias
+
+# Coverage and Plotting (DeepTools)
+deeptools:
+  bin_size: 500 # Width of bins for normalization (bp)
+  smooth_length: 1500 # Range over which to smooth the signal (bp)
+  normalization_method: RPGC # Normalization: RPKM, CPM, BPM, RPGC (Recommended: RPGC)
+
+  # QC plot grouping modes (any combination, remove to disable)
+  # - all:             All samples in one plot
+  # - condition:       Per-condition (e.g., Control IP , Control Input, infected IP , Infected Input)
+  # - condition_assay: Per-condition+assay (e.g., Control H3K9ac + Control Input)
+  qc_grouping:
+    - all
+    - condition
+    - condition_assay
+
+  # TSS profile plots
+  tss_upstream: 3000
+  tss_downstream: 10000
+
+  # Gene body profile plots
+  gene_body_length: 5000
+  gene_body_upstream: 1000
+  gene_body_downstream: 1000
+
+  plots:
+    dpi: 600
+    correlation:
+      plot_width: 11
+      plot_height: 9.5
+    pca:
+      plot_width: 14
+      plot_height: 12
+      markers: []
+      colors: []
+
+# Peak Calling (MACS3)
+macs3:
+  params:
+    genome_size: 15072434 # Effective size for p-value calculation   Comment- Effecective genome sxize alraedy sttes that 
+    pvalue_cutoff: 0.01 # p-value threshold for peak calling
+    keep_dup: all # Default: 'all' if dedup was handled manually, otherwise 'auto'  comment if markduplicate - Truye , keep dup should be auto 
+    broad_cutoff: 0.01 # Cutoff for broad peak calling
+    generate_bedgraph: false # Output BedGraph files
+    bedgraph_spmr: false # Save-pileup-multi-read (use with caution)
+    format: BAM # Input format: BAM or BAMPE (for paired-end)
+    no_model: true # Skip building the shifting model (use extsize instead)
+    extsize: 147 # Extension size (if no_model is true)  ( Cosnider the )
+
+# Explicit sample pairing (Optional: used only if metadata_tsv is not provided)
+# Note: The Snakefile expects 'macs3_samples' at top level for explicit mode.
+macs3_samples: {}
+
+# ------------------------------------------------------------------------------
+# 5. Optional Features and Resources
+# ------------------------------------------------------------------------------
+optional_tools:
+  spp_script: /opt/anaconda3/envs/chip/bin/run_spp.R # Path to run_spp.R script
+  run_spp: true # Run SPP cross-correlation analysis (requires R environment)
+  run_homer: false # Run HOMER motif enrichment analysis
+  homer_params:
+    size: 200 # Region size for motif search
+    length: 8,10,12 # Length of motifs to search for
+    mask: true # Use masked genome
+
+# Resource limits (Memory in Megabytes)
+resources:
+  align_mem_mb: 8000
+  markdup_mem_mb: 4000
+  deeptools_mem_mb: 16000
+  default_mem_mb: 4000
+
+# Environment Names (for Conda)
+environments:
+  idr: idr_env
+
+# IDR Reproducibility analysis
+idr:
+  rank_column: signal.value # Column to use for ranking peaks

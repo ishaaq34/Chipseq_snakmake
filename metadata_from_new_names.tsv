@@ -1,0 +1,5 @@
+raw_id	condition	replicate	assay	mark_type
+H3K27me3_IP_rep1	Control	1	H3K27me3	broad
+H3K27me3_IP_rep2	Control	2	H3K27me3	broad
+Input_rep1	Control	1	input	
+Input_rep2	Control	2	input	
