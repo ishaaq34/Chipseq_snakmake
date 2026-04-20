@@ -128,3 +128,9 @@ The workflow executes the following logical steps:
     * **Profiles**: Metagene plots (TSS and Gene Body).
 8. **`IDR` / `SPP`**: (Optional) Reproducibility analysis between replicates.
 
+### workflow_rulegraph
+
+
+<img width="4931" height="1142" alt="workflow_rulegraph" src="https://github.com/user-attachments/assets/0f5e4f50-6123-4d50-9316-97f6349f0002" />
+
+
